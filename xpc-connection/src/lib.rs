@@ -1,6 +1,5 @@
 #[allow(
     dead_code,
-    safe_packed_borrows,
     non_upper_case_globals,
     non_camel_case_types,
     non_snake_case,
@@ -14,7 +13,7 @@ pub use message::*;
 use block::ConcreteBlock;
 use futures::{
     channel::mpsc::{unbounded as unbounded_channel, UnboundedReceiver, UnboundedSender},
-    Stream,
+    Sink, Stream,
 };
 use std::ffi::CStr;
 use std::{ffi::c_void, ops::Deref};
@@ -166,6 +165,28 @@ impl Stream for XpcClient {
             }
             v => v,
         }
+    }
+}
+
+impl Sink<Message> for XpcClient {
+    type Error = ();
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: Message) -> Result<(), Self::Error> {
+        let item = message_to_xpc_object(item);
+        unsafe { xpc_connection_send_message(self.connection, item) };
+        Ok(())
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 }
 
