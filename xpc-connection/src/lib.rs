@@ -19,9 +19,10 @@ use std::ffi::CStr;
 use std::{ffi::c_void, ops::Deref};
 use std::{pin::Pin, task::Poll};
 use xpc_connection_sys::{
-    xpc_connection_cancel, xpc_connection_create_mach_service, xpc_connection_resume,
-    xpc_connection_send_message, xpc_connection_set_event_handler, xpc_connection_t, xpc_object_t,
-    xpc_release, XPC_CONNECTION_MACH_SERVICE_LISTENER, XPC_CONNECTION_MACH_SERVICE_PRIVILEGED,
+    xpc_connection_cancel, xpc_connection_create, xpc_connection_create_mach_service,
+    xpc_connection_resume, xpc_connection_send_message, xpc_connection_set_event_handler,
+    xpc_connection_t, xpc_object_t, xpc_release, XPC_CONNECTION_MACH_SERVICE_LISTENER,
+    XPC_CONNECTION_MACH_SERVICE_PRIVILEGED,
 };
 
 // A connection's event handler could still be waiting or running when we want
@@ -114,6 +115,13 @@ impl XpcListener {
 
     pub fn listen(name: impl AsRef<CStr>) -> Self {
         let name = name.as_ref();
+        let connection =
+            unsafe { xpc_connection_create(name.as_ref().as_ptr(), std::ptr::null_mut()) };
+        Self::from_raw(connection)
+    }
+
+    pub fn listen_mach(name: impl AsRef<CStr>) -> Self {
+        let name = name.as_ref();
         let flags = XPC_CONNECTION_MACH_SERVICE_LISTENER as u64;
         let connection = unsafe {
             xpc_connection_create_mach_service(name.as_ref().as_ptr(), std::ptr::null_mut(), flags)
@@ -171,7 +179,10 @@ impl Stream for XpcClient {
 impl Sink<Message> for XpcClient {
     type Error = ();
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
@@ -181,11 +192,17 @@ impl Sink<Message> for XpcClient {
         Ok(())
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 }
@@ -221,8 +238,14 @@ impl XpcClient {
         }
     }
 
-    /// The connection isn't established until the first call to `send_message`.
     pub fn connect(name: impl AsRef<CStr>) -> Self {
+        let name = name.as_ref();
+        let connection = unsafe { xpc_connection_create(name.as_ptr(), std::ptr::null_mut()) };
+        Self::from_raw(connection)
+    }
+
+    /// The connection isn't established until the first call to `send_message`.
+    pub fn connect_mach(name: impl AsRef<CStr>) -> Self {
         let name = name.as_ref();
         let flags = XPC_CONNECTION_MACH_SERVICE_PRIVILEGED as u64;
         let connection = unsafe {
