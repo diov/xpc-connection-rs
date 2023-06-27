@@ -112,6 +112,8 @@ pub enum Message {
     Null,
 }
 
+unsafe impl Send for Message {}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MessageError {
     /// The connection was interrupted, but is still usable. Clients should
